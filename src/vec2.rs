@@ -1,4 +1,4 @@
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Vec2 {
     pub x: f64,
     pub y: f64,
@@ -28,5 +28,9 @@ impl Vec2 {
 
     pub fn cross(&self, other: &Vec2) -> f64 {
         self.x * other.y - self.y * other.x
+    }
+
+    pub fn distance(&self, other: &Vec2) -> f64 {
+        ( (other.x - self.x).powi(2) + (other.y - self.y).powi(2) ).sqrt()
     }
 }
