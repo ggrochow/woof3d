@@ -2,18 +2,19 @@ extern crate rustc_serialize;
 extern crate sdl2;
 
 mod vec2;
+mod world;
+mod maze;
 
 use vec2::Vec2;
 use sdl2::pixels::Color;
 use rustc_serialize::json;
-use std::io::prelude::*;
-use std::fs::File;
+use std::collections::HashSet;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use sdl2::render::Renderer;
 use sdl2::rect::Rect;
-use std::collections::HashSet;
 use std::time::Duration;
+use world::{World, Wall, Camera};
 
 fn main() {
 
@@ -21,13 +22,15 @@ fn main() {
      ** ONLY STEP THAT CAN PANIC **
 
         1) Setup
-            Load in.json, defines camera-angle, fov, h/w + walls
+            generate maze, convert to points
             start the event-pump, open window.
             start threads, and move things to wherever is needed.
     ********/
 
-    let mut world = load_world_from_json_argv();
-
+    let mut world = World::default();
+    let maze = maze::Maze::generate_maze(10, 10);
+    world.walls = maze.to_walls(1);
+    println!("{}", maze);
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
 
@@ -68,21 +71,13 @@ fn main() {
         let keys: HashSet<_> = events.keyboard_state().pressed_scancodes().filter_map(Keycode::from_scancode).collect();
         for key in keys {
             match key {
-                Keycode::A => world.camera.theta += 0.015,
-                Keycode::D => world.camera.theta -= 0.015,
+                Keycode::A => world.camera.theta += 0.02,
+                Keycode::D => world.camera.theta -= 0.02,
                 Keycode::W => {
-                    let move_vec = Vec2 {
-                        x: world.camera.theta.cos(),
-                        y: world.camera.theta.sin()
-                    };
-                    world.camera.p0 = world.camera.p0.plus(&move_vec.multiply(0.05))
+                    world.move_forward();
                 },
                 Keycode::S => {
-                    let move_vec = Vec2 {
-                        x: world.camera.theta.cos(),
-                        y: world.camera.theta.sin()
-                    };
-                    world.camera.p0 = world.camera.p0.minus(&move_vec.multiply(0.05))
+                    world.move_backwards();
                 }
                 Keycode::Z => {
                     world.camera.horizon += 10;
@@ -156,6 +151,9 @@ fn draw_world(renderer: &mut Renderer, world: &World) {
 }
 
 fn get_wall_pixel_height(v0: &Vec2, distance: f64, camera: &Camera) -> i32 {
+    // TODO: bugfix - it is possible for v0 + v1 to the same
+    // easily reproduce by setting camera-default pos to 1,1
+    // probably just draw it at full height, though we shoudln't really ever let this happen
     let v_fov = camera.h_fov * camera.height / camera.width;
     let half_fov = v_fov / 2.0;
 
@@ -169,13 +167,11 @@ fn get_wall_pixel_height(v0: &Vec2, distance: f64, camera: &Camera) -> i32 {
     // p1 = top point of cameras v-fov
     let p1_dist = distance / half_fov.sin();
     let p1 = camera.p0.plus(&v1.multiply(p1_dist));
-
     // ground -> top camera at intersection point
     let wall_dist = p0.distance(&p1);
     let percentage = get_draw_plane_height(camera) / wall_dist;
 
     // TODO: if the wall-height changes, we will need to do some additional math
-
     ((camera.height) * percentage) as i32
 }
 
@@ -254,16 +250,14 @@ fn get_ray_vecs(camera: &Camera) -> Vec<Vec2> {
 }
 
 fn get_distance_to_ray_line_intersection(p0: &Vec2, v0: &Vec2, p1: &Vec2, p2: &Vec2) -> Option<f64> {
+    // TODO: refactor this with line-line intersection
+    // we can use the same function up until we have to check s0/s1
+    // so we can just return those and save duplicate
     let v1 = p2.minus(&p1);
 
     let v0_cross_v1 = v0.cross(&v1);
 
-    //    println!("p0 = {:?}, v0 = {:?}, p1 = {:?}, v1 = {:?}", p0, v0, p1, v1);
     if v0_cross_v1 == 0.0 {
-        //    if (v0_cross_v1 * 100000.0).round() / 100000.0 == 0.0 {
-        // rounding to deal with the fact that our angles aren't perfect due to input-radians-accuracy
-        // Segments are parallel / co-linear
-        // in our case we don't care about co-linear collisions
         return None;
     }
 
@@ -273,128 +267,30 @@ fn get_distance_to_ray_line_intersection(p0: &Vec2, v0: &Vec2, p1: &Vec2, p2: &V
     let s1 = p1_minus_p0.cross(&v0) / v0_cross_v1;
 
     if s0 >= 0.0 && s1 <= 1.0 && s1 >= 0.0 {
-        // because v0 is of 1 distance,
-        // s0 = distance to collision
-        //        println!("{:?}", p0.plus(&v0.multiply(s0)));
         Some(s0)
     } else {
         None
     }
 }
 
-fn load_world_from_json_argv() -> World {
-    let file_name = std::env::args().nth(1).expect("1st ARGV must be the desired input file");
-    let mut file_as_string = String::new();
-    File::open(file_name).expect("The file path must be a valid, open-able file")
-        .read_to_string(&mut file_as_string).expect("The file must be valid utf-8");
 
-    let json: WorldJSON = json::decode(&file_as_string).expect("File must be a valid input.json file");
+pub fn get_distance_to_line_line_intersection(p0: &Vec2, v0: &Vec2, p1: &Vec2, p2: &Vec2) -> Option<f64> {
+    let v1 = p2.minus(&p1);
 
-    json.into()
-}
+    let v0_cross_v1 = v0.cross(&v1);
 
-fn vec_to_color(color_vec: Vec<u8>) -> Color {
-    Color::RGB(
-        color_vec[0],
-        color_vec[1],
-        color_vec[2],
-    )
-}
-
-#[derive(RustcDecodable, Debug)]
-struct WorldJSON {
-    walls: Vec<WallJSON>,
-    ground_color: Vec<u8>,
-    sky_color: Vec<u8>,
-    camera: CameraJSON
-}
-
-#[derive(Debug)]
-struct World {
-    walls: Vec<Wall>,
-    ground_color: Color,
-    sky_color: Color,
-    camera: Camera
-}
-
-impl From<WorldJSON> for World {
-    fn from(json: WorldJSON) -> Self {
-
-        let mut walls: Vec<Wall> = Vec::new();
-        for wall in json.walls {
-            walls.push(wall.into())
-        }
-
-        World {
-            walls: walls,
-            ground_color: vec_to_color(json.ground_color),
-            sky_color: vec_to_color(json.sky_color),
-            camera: json.camera.into()
-        }
+    if v0_cross_v1 == 0.0 {
+        return None;
     }
-}
 
-#[derive(RustcDecodable, Debug)]
-struct WallJSON {
-    x0: f64,
-    x1: f64,
-    y0: f64,
-    y1: f64,
-    color: Vec<u8>
-}
+    let p1_minus_p0 = p1.minus(&p0);
 
-#[derive(Debug, Clone)]
-struct Wall {
-    p0: Vec2,
-    p1: Vec2,
-    color: Color,
-}
+    let s0 = p1_minus_p0.cross(&v1) / v0_cross_v1;
+    let s1 = p1_minus_p0.cross(&v0) / v0_cross_v1;
 
-impl From<WallJSON> for Wall {
-    fn from(json: WallJSON) -> Self {
-        Wall{
-            p0: Vec2 { x: json.x0, y: json.y0 },
-            p1: Vec2 { x: json.x1, y: json.y1 },
-            color: vec_to_color(json.color)
-        }
-    }
-}
-
-#[derive(RustcDecodable, Debug)]
-struct CameraJSON {
-    x: f64,
-    y: f64,
-    theta: f64,
-    h_fov: f64,
-    width: f64,
-    height: f64,
-}
-
-#[derive(Debug)]
-struct Camera {
-    p0: Vec2,
-    theta: f64,
-    h_fov: f64,
-    width: f64,
-    height: f64,
-    horizon: i32,
-}
-
-impl From<CameraJSON> for Camera {
-    fn from(json: CameraJSON) -> Self {
-        let horizon = if json.width % 2.0 == 0.0 {
-            json.height/ 2.0
-        } else {
-            (json.height / 2.0).round()
-        };
-
-        Camera {
-            p0: Vec2 { x: json.x, y: json.y },
-            theta: json.theta,
-            h_fov: json.h_fov,
-            width: json.width,
-            height: json.height,
-            horizon: horizon as i32,
-        }
+    if s0 <= 1.0 && s0 >= 0.0 && s1 <= 1.0 && s1 >= 0.0 {
+        Some(s0)
+    } else {
+        None
     }
 }
