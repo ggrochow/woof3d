@@ -1,6 +1,8 @@
 use vec2::Vec2;
 use sdl2::pixels::Color;
 
+static MOVE_SPEED_SCALING: f64 = 0.025;
+
 #[derive(Debug)]
 pub struct World {
     pub walls: Vec<Wall>,
@@ -14,7 +16,7 @@ impl World {
         let move_vec = Vec2 {
             x: self.camera.theta.cos(),
             y: self.camera.theta.sin()
-        }.multiply(0.05);
+        }.multiply(MOVE_SPEED_SCALING);
 
         for wall in &self.walls {
             if let Some(_) = super::get_distance_to_line_line_intersection(&self.camera.p0, &move_vec, &wall.p0, &wall.p1) {
@@ -23,21 +25,6 @@ impl World {
         }
 
         self.camera.p0 = self.camera.p0.plus(&move_vec)
-    }
-
-    pub fn move_backwards(&mut self) {
-        let move_vec = Vec2 {
-            x: self.camera.theta.cos(),
-            y: self.camera.theta.sin()
-        }.multiply(0.05);
-
-        for wall in &self.walls {
-            if let Some(_) = super::get_distance_to_line_line_intersection(&self.camera.p0, &move_vec, &wall.p0, &wall.p1) {
-                return;
-            }
-        }
-
-        self.camera.p0 = self.camera.p0.minus(&move_vec)
     }
 }
 
@@ -87,7 +74,7 @@ pub struct Camera {
 impl Default for Camera {
     fn default() -> Self {
         Camera {
-            p0: Vec2{ x: 1.5, y: 1.5 },
+            p0: Vec2{ x: 0.5, y: 0.5 },
             theta: 1.0,
             h_fov: 1.0,
             width: 800.0,

@@ -1,13 +1,10 @@
 use std::fmt;
 use std::fmt::Write;
-use vec2::Vec2;
 use std::collections::HashMap;
 use std::collections::BTreeSet;
-extern crate rand;
-use self::rand::Rng;
+use rand::Rng;
+use rand;
 use world::Wall;
-use sdl2::pixels::Color;
-
 
 pub struct Maze {
     pub height: usize,
@@ -98,12 +95,11 @@ impl Maze {
         let mut x_cursor = Some(0);
         let mut y_cursor = Some(0);
 
-        match direction {
-            &Direction::N => y_cursor = y.checked_sub(1),
-            &Direction::S => y_cursor = y.checked_add(1),
-
-            &Direction::E => x_cursor = x.checked_add(1),
-            &Direction::W => x_cursor = x.checked_sub(1),
+        match *direction {
+            Direction::N => y_cursor = y.checked_sub(1),
+            Direction::S => y_cursor = y.checked_add(1),
+            Direction::E => x_cursor = x.checked_add(1),
+            Direction::W => x_cursor = x.checked_sub(1),
         };
 
         if x_cursor.is_none() || y_cursor.is_none() {
@@ -117,8 +113,7 @@ impl Maze {
                     x_res = x;
                 },
                 &Direction::E | &Direction::W => {
-                    y_res
-                        = y;
+                    y_res = y;
                 },
             }
 
@@ -133,22 +128,11 @@ impl Maze {
     pub fn get_cell_neighbours(&self, cell: &Cell) -> Vec<Cell> {
         let mut out = Vec::with_capacity(4);
 
-        if let Some(n) = self.get_cell_in_direction(cell, &Direction::N) {
-            out.push(n.clone());
+        for dir in Direction::all().into_iter() {
+            if let Some(cell) = self.get_cell_in_direction(cell, &dir) {
+                out.push(cell.clone());
+            }
         }
-
-        if let Some(e) = self.get_cell_in_direction(cell, &Direction::E) {
-            out.push(e.clone());
-        }
-
-        if let Some(s) = self.get_cell_in_direction(cell, &Direction::S) {
-            out.push(s.clone());
-        }
-
-        if let Some(w) = self.get_cell_in_direction(cell, &Direction::W) {
-            out.push(w.clone())
-        };
-
         out
     }
 
@@ -157,8 +141,6 @@ impl Maze {
     }
 
     pub fn to_walls(&self, scale: usize) -> Vec<Wall> {
-        let mut rng = rand::thread_rng();
-
         let mut out = Vec::new();
 
         for cell in &self.cells {

@@ -1,5 +1,6 @@
 extern crate rustc_serialize;
 extern crate sdl2;
+extern crate rand;
 
 mod vec2;
 mod world;
@@ -7,7 +8,6 @@ mod maze;
 
 use vec2::Vec2;
 use sdl2::pixels::Color;
-use rustc_serialize::json;
 use std::collections::HashSet;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
@@ -30,7 +30,7 @@ fn main() {
     let mut world = World::default();
     let maze = maze::Maze::generate_maze(10, 10);
     world.walls = maze.to_walls(1);
-    println!("{}", maze);
+    println!("{}\nEnjoy your maze!\nYou start in the top-left", maze);
     let sdl_context = sdl2::init().unwrap();
     let video_subsystem = sdl_context.video().unwrap();
 
@@ -45,18 +45,9 @@ fn main() {
         2) Game Loop
             poll on event-pump, check inputs, take action
 
-            p1
-                no-input, just spins
-            p2
-                wasd, forward backwards + rotation.
-                no collsion detection
-            p4
-                collsion detection
-
         GameObject
             walls,
             camera { x, y, angle, fov, height, width },
-            ?
     ********/
 
     'running: loop {
@@ -76,9 +67,6 @@ fn main() {
                 Keycode::W => {
                     world.move_forward();
                 },
-                Keycode::S => {
-                    world.move_backwards();
-                }
                 Keycode::Z => {
                     world.camera.horizon += 10;
                 },
@@ -89,16 +77,18 @@ fn main() {
             }
         }
 
+    /******
+     
+     3) Presentation
+        Draw game-world to screen
+        sleep a little to limit FPS
+
+    ******/
+
         draw_world(&mut renderer, &world);
         std::thread::sleep(Duration::from_millis(10));
     }
 
-    /********
-        3) Draw
-            take input, draw to screen.
-            clear, draw top half sky, bottom half ground
-            1 draw call for each wall.
-    ********/
 
 }
 
@@ -183,11 +173,6 @@ fn draw_wall(renderer: &mut Renderer, x: i32, height: i32, horizon: i32, color: 
             x, horizon - height, 1, (height * 2) as u32
         )
     );
-}
-
-fn get_draw_plane_width(camera: &Camera) -> f64 {
-    let (p0, p1) = get_draw_plane_points(camera);
-    p0.distance(&p1)
 }
 
 fn get_draw_plane_height(camera: &Camera) -> f64 {
