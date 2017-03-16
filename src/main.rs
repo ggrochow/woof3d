@@ -1,4 +1,3 @@
-extern crate rustc_serialize;
 extern crate sdl2;
 extern crate rand;
 

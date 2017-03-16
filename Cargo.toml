@@ -4,6 +4,5 @@ version = "0.1.0"
 authors = ["Graham Grochowski <ggrochow@gmail.com>"]
 
 [dependencies]
-rustc-serialize = "0.3"
 sdl2 = "0.27.0"
 rand="0.3"
