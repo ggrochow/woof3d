@@ -1,11 +1,8 @@
 # Woof3d
 ## Wander aimlessly around an enclosed maze.
+![Short video preview](https://raw.githubusercontent.com/ggrochow/woof3d/master/preview.gif)
 
-### Features
-New randomly generated maze every time you open.
-"Stunning" 2.5d Graphics
-Some form of collision detection.
-
+New randomly generated maze every time you open. "Stunning" 2.5d Graphics, and some form of collision detection.
 
 ### Pre-Setup
 Requires [rust](https://www.rust-lang.org) as well as the [SDL2](https://www.libsdl.org) development libraries.
@@ -29,9 +26,10 @@ Thats it, it might take a moment to compile, but after its ready a game-window s
 
 
 ### Controls
-`W` - Move forward
-`A` - Turn left
-`D` - Turn right
-`Z` - Look up
-`X` - Look down
-
+``` 
+W - Move forward
+A - Turn left
+D - Turn right
+Z - Look up
+X - Look down
+``` 
